@@ -41,6 +41,16 @@ module HtmlToPlainText
       end
     end
 
+    # Remove new lines before and after <b>
+    # to accomodate for HAML formating
+    txt.gsub!(/\/b>\n/,'/\1> ')
+    txt.gsub!(/\n[\t ]*<b/,' <\1')
+
+    # Remove newlines in text
+    # to accomodate for HAML formating
+    txt.gsub!(/([^\n\t >])\n[\n\t ]*([^\n\t <])/,'\1 \2')
+
+
     # handle headings (H1-H6)
     txt.gsub!(/(<\/h[1-6]>)/i, "\n\\1") # move closing tags to new lines
     txt.gsub!(/[\s]*<h([1-6]+)[^>]*>[\s]*(.*)[\s]*<\/h[1-6]+>/i) do |s|
