@@ -5,6 +5,7 @@ class Premailer
     # Nokogiri adapter
     module Nokogumbo
 
+      include AdapterHelper::RgbToHex
       # Merge CSS into the HTML document.
       #
       # @return [String] an HTML.
@@ -75,9 +76,14 @@ class Premailer
           # Duplicate CSS attributes as HTML attributes
           if Premailer::RELATED_ATTRIBUTES.has_key?(el.name) && @options[:css_to_attributes]
             Premailer::RELATED_ATTRIBUTES[el.name].each do |css_att, html_att|
-              el[html_att] = merged[css_att].gsub(/url\(['|"](.*)['|"]\)/, '\1').gsub(/;$|\s*!important/, '').strip if el[html_att].nil? and not merged[css_att].empty?
-              merged.instance_variable_get("@declarations").tap do |declarations|
-                declarations.delete(css_att)
+              if el[html_att].nil? and not merged[css_att].empty?
+                new_html_att = merged[css_att].gsub(/url\(['"](.*)['"]\)/, '\1').gsub(/;$|\s*!important/, '').strip
+                el[html_att] = css_att.end_with?('color') && @options[:rgb_to_hex_attributes] ? ensure_hex(new_html_att) : new_html_att
+              end
+              unless @options[:preserve_style_attribute]
+                merged.instance_variable_get("@declarations").tap do |declarations|
+                    declarations.delete(css_att)
+                end
               end
             end
           end
@@ -85,9 +91,7 @@ class Premailer
           merged.create_shorthand! if @options[:create_shorthands]
 
           # write the inline STYLE attribute
-          attributes = Premailer.escape_string(merged.declarations_to_s).split(';').map(&:strip)
-          attributes = attributes.map { |attr| [attr.split(':').first, attr] }.sort_by { |pair| pair.first }.map { |pair| pair[1] }
-          el['style'] = attributes.join('; ') + ";"
+          el['style'] = merged.declarations_to_s
         end
 
         doc = write_unmergable_css_rules(doc, @unmergable_rules)
@@ -137,24 +141,24 @@ class Premailer
       end
 
       # Create a <tt>style</tt> element with un-mergable rules (e.g. <tt>:hover</tt>)
-      # and write it into the <tt>body</tt>.
+      # and write it into the <tt>head</tt>.
       #
       # <tt>doc</tt> is an Nokogiri document and <tt>unmergable_css_rules</tt> is a Css::RuleSet.
       #
       # @return [::Nokogiri::XML] a document.
       def write_unmergable_css_rules(doc, unmergable_rules) # :nodoc:
         styles = unmergable_rules.to_s
-
         unless styles.empty?
-          style_tag = "<style type=\"text/css\">\n#{styles}</style>"
-          unless (body = doc.search('body')).empty?
-            if doc.at_css('body').children && !doc.at_css('body').children.empty?
-              doc.at_css('body').children.before(::Nokogiri::XML.fragment(style_tag))
-            else
-              doc.at_css('body').add_child(::Nokogiri::XML.fragment(style_tag))
-            end
+          if @options[:html_fragment]
+            style_tag = ::Nokogiri::XML::Node.new("style", doc)
+            style_tag.content = styles
+            doc.add_child(style_tag)
           else
-            doc.inner_html = style_tag += doc.inner_html
+            style_tag = doc.create_element "style", styles
+            head = doc.at_css('head')
+            head ||= doc.root.first_element_child.add_previous_sibling(doc.create_element "head") if doc.root && doc.root.first_element_child
+            head ||= doc.add_child(doc.create_element "head")
+            head << style_tag
           end
         end
         doc
@@ -220,10 +224,11 @@ class Premailer
         # However, we really don't want to hardcode this. ASCII-8BIT should be the default, but not the only option.
         if thing.is_a?(String) and RUBY_VERSION =~ /1.9/
           thing = thing.force_encoding(@options[:input_encoding]).encode!
-          doc = ::Nokogiri::HTML5(thing)
+        end
+        doc = if @options[:html_fragment]
+          ::Nokogiri::HTML5(thing)
         else
-          default_encoding = RUBY_PLATFORM == 'java' ? nil : 'BINARY'
-          doc = ::Nokogiri::HTML5(thing)
+          ::Nokogiri::HTML5.fragment(thing)
         end
 
         # Fix for removing any CDATA tags from both style and script tags inserted per

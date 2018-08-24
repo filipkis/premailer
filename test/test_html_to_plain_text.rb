@@ -44,7 +44,7 @@ END_HTML
     assert_plaintext "a\na", "  \na \n a \t"
     assert_plaintext "a\n\na", "  \na \n\t \n \n a \t"
     assert_plaintext "test text", "test text&nbsp;"
-    assert_plaintext "test text", "test        text"
+    assert_plaintext "test        text", "test        text"
   end
 
   def test_wrapping_spans
@@ -114,8 +114,8 @@ END_HTML
     assert lens.max <= 20
   end
 
-  def test_wrapping_lines_with_spaces
-    assert_plaintext "Long line\nnew line", 'Long     line new line', nil ,10
+  def test_wrapping_lines_with_many_spaces
+    assert_plaintext "Long     line\nnext line", "Long     line next line", nil ,14
   end
 
   def test_img_alt_tags
@@ -170,6 +170,9 @@ END_HTML
 
     # links that go outside of line should wrap nicely
     assert_plaintext "Long text before the actual link and then LINK TEXT \n( http://www.long.link ) and then more text that does not wrap", 'Long text before the actual link and then <a href="http://www.long.link"/>LINK TEXT</a> and then more text that does not wrap'
+
+    # same text and link
+    assert_plaintext 'http://example.com', '<a href="http://example.com">http://example.com</a>'
   end
 
   # see https://github.com/alexdunae/premailer/issues/72
@@ -183,6 +186,15 @@ END_HTML
   def test_links_within_headings
     assert_plaintext "****************************\nTest ( http://example.com/ )\n****************************",
                      "<h1><a href='http://example.com/'>Test</a></h1>"
+  end
+
+  def test_unterminated_anchor_tag
+    assert_plaintext("Example -->", <<-HTML)
+            <th>
+          <!-- <a href="https://www.example.com">
+                Example -->
+            </th>
+    HTML
   end
 
   def assert_plaintext(out, raw, msg = nil, line_length = 65)
