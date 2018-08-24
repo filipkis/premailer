@@ -31,7 +31,7 @@ module HtmlToPlainText
     txt.gsub!(/<img.+?alt=\'([^\']*)\'[^>]*\>/i, '\1')
 
     # links
-    txt.gsub!(/<a\s.*?href=["'](mailto:)?([^"']*)["'][^>]*>((.|\s)*?)<\/a>/i) do |s|
+    txt.gsub!(/<a\s[^\n]*?href=["'](mailto:)?([^"']*)["'][^>]*>(.*?)<\/a>/im) do |s|
       if $3.empty?
         ''
       elsif $3.strip.downcase == $2.strip.downcase
@@ -96,9 +96,7 @@ module HtmlToPlainText
     he = HTMLEntities.new
     txt = he.decode(txt)
 
-    # no more than two consecutive spaces
-    txt.gsub!(/ {2,}/, " ")
-
+    # word wrap
     txt = word_wrap(txt, line_length)
 
     # remove linefeeds (\r\n and \r -> \n)

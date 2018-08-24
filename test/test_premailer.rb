@@ -24,31 +24,22 @@ class TestPremailer < Premailer::TestCase
   #  end
   #end
 
-  # TODO: this passes when run from rake but not when run from:
-  #  ruby -Itest test/test_premailer.rb -n test_special_characters_hpricot
-  def test_special_characters_hpricot
-    html = 	'<p>cédille c&eacute; & garçon gar&#231;on à &agrave; &nbsp; &amp;</p>'
-    premailer = Premailer.new(html, :with_html_string => true, :adapter => :hpricot)
-    premailer.to_inline_css
-    assert_equal 'c&eacute;dille c&eacute; &amp; gar&ccedil;on gar&ccedil;on &agrave; &agrave; &nbsp; &amp;', premailer.processed_doc.at('p').inner_html
-  end
-
   def test_detecting_html
-    [:nokogiri, :hpricot].each do |adapter|
+    [:nokogiri, :nokogiri_fast, :nokogumbo].each do |adapter|
       remote_setup('base.html', :adapter => adapter)
       assert !@premailer.is_xhtml?
     end
   end
 
   def test_detecting_xhtml
-    [:nokogiri, :hpricot].each do |adapter|
+    [:nokogiri, :nokogiri_fast, :nokogumbo].each do |adapter|
       remote_setup('xhtml.html', :adapter => adapter)
       assert @premailer.is_xhtml?
     end
   end
 
   def test_self_closing_xhtml_tags
-    [:nokogiri, :hpricot].each do |adapter|
+    [:nokogiri, :nokogiri_fast, :nokogumbo].each do |adapter|
       remote_setup('xhtml.html', :adapter => adapter)
       assert_match /<br[\s]*\/>/, @premailer.to_s
       assert_match /<br[\s]*\/>/, @premailer.to_inline_css
@@ -56,7 +47,7 @@ class TestPremailer < Premailer::TestCase
   end
 
   def test_non_self_closing_html_tags
-    [:nokogiri, :hpricot].each do |adapter|
+    [:nokogiri, :nokogiri_fast, :nokogumbo].each do |adapter|
       remote_setup('html4.html', :adapter => adapter)
       assert_match /<br>/, @premailer.to_s
       assert_match /<br>/, @premailer.to_inline_css
@@ -72,22 +63,15 @@ END_HTML
 
     qs = 'testing=123'
 
-    [:nokogiri, :hpricot].each do |adapter|
+    [:nokogiri, :nokogiri_fast, :nokogumbo].each do |adapter|
       premailer = Premailer.new(html, :with_html_string => true, :link_query_string => qs, :adapter => adapter)
       premailer.to_inline_css
       refute_match /testing=123/, premailer.processed_doc.search('a').first.attributes['href'].to_s
     end
   end
 
-  def test_escaping_strings
-    local_setup
-
-    str = %q{url("/images/test.png");}
-    assert_equal("url(\'/images/test.png\');", Premailer.escape_string(str))
-  end
-
   def test_preserving_ignored_style_elements
-    [:nokogiri, :hpricot].each do |adapter|
+    [:nokogiri, :nokogiri_fast, :nokogumbo].each do |adapter|
       local_setup('ignore.html', :adapter => adapter)
 
       assert_nil @doc.at('h1')['style']
@@ -95,7 +79,7 @@ END_HTML
   end
 
   def test_preserving_ignored_link_elements
-    [:nokogiri, :hpricot].each do |adapter|
+    [:nokogiri, :nokogiri_fast, :nokogumbo].each do |adapter|
       local_setup('ignore.html', :adapter => adapter)
 
       assert_nil @doc.at('body')['style']
@@ -103,8 +87,7 @@ END_HTML
   end
 
   def test_importing_local_css
-    # , :hpricot
-    [:nokogiri].each do |adapter|
+    [:nokogiri, :nokogiri_fast, :nokogumbo].each do |adapter|
       local_setup('base.html', :adapter => adapter)
 
       # noimport.css (print stylesheet) sets body { background } to red
@@ -116,26 +99,26 @@ END_HTML
   end
 
   def test_css_to_attributes
-    [:nokogiri, :hpricot].each do |adapter|
+    [:nokogiri, :nokogiri_fast, :nokogumbo].each do |adapter|
       html = '<td style="background-color: #FFF;"></td>'
       premailer = Premailer.new(html, {:with_html_string => true, :adapter => adapter, :css_to_attributes => true})
       premailer.to_inline_css
-      assert_equal ';', premailer.processed_doc.search('td').first.attributes['style'].to_s
+      assert_equal '', premailer.processed_doc.search('td').first.attributes['style'].to_s
       assert_equal '#FFF', premailer.processed_doc.search('td').first.attributes['bgcolor'].to_s
     end
   end
 
   def test_avoid_changing_css_to_attributes
-    [:nokogiri, :hpricot].each do |adapter|
+    [:nokogiri, :nokogiri_fast, :nokogumbo].each do |adapter|
       html = '<td style="background-color: #FFF;"></td>'
       premailer = Premailer.new(html, {:with_html_string => true, :adapter => adapter, :css_to_attributes => false})
       premailer.to_inline_css
-      assert_match /background: #FFF/, premailer.processed_doc.search('td').first.attributes['style'].to_s
+      assert_match /background-color: #FFF/, premailer.processed_doc.at_css('td').attributes['style'].to_s
     end
   end
 
   def test_importing_remote_css
-    [:nokogiri, :hpricot].each do |adapter|
+    [:nokogiri, :nokogiri_fast, :nokogumbo].each do |adapter|
       remote_setup('base.html', :adapter => adapter)
 
       # noimport.css (print stylesheet) sets body { background } to red
@@ -151,7 +134,7 @@ END_HTML
 
     css_string = IO.read(File.join(files_base, 'import.css'))
 
-    [:nokogiri, :hpricot].each do |adapter|
+    [:nokogiri, :nokogiri_fast, :nokogumbo].each do |adapter|
       premailer = Premailer.new(File.join(files_base, 'no_css.html'), {:css_string => css_string, :adapter => adapter})
       premailer.to_inline_css
       @doc = premailer.processed_doc
@@ -174,7 +157,7 @@ END_HTML
   end
 
   def test_initialize_can_accept_io_object
-    [:nokogiri, :hpricot].each do |adapter|
+    [:nokogiri, :nokogiri_fast, :nokogumbo].each do |adapter|
       io = StringIO.new('hi mom')
       premailer = Premailer.new(io, :adapter => adapter)
       assert_match /hi mom/, premailer.to_inline_css
@@ -182,7 +165,7 @@ END_HTML
   end
 
   def test_initialize_can_accept_html_string
-    [:nokogiri, :hpricot].each do |adapter|
+    [:nokogiri, :nokogiri_fast, :nokogumbo].each do |adapter|
       premailer = Premailer.new('<p>test</p>', :with_html_string => true, :adapter => adapter)
       assert_match /test/, premailer.to_inline_css
     end
@@ -196,7 +179,7 @@ END_HTML
 		</body> </html>
 END_HTML
 
-    [:nokogiri, :hpricot].each do |adapter|
+    [:nokogiri, :nokogiri_fast, :nokogumbo].each do |adapter|
       pm = Premailer.new(html, :with_html_string => true, :adapter => adapter, :escape_url_attributes => false)
       pm.to_inline_css
       doc = pm.processed_doc
@@ -214,7 +197,7 @@ END_HTML
 		</body> </html>
 END_HTML
 
-    [:nokogiri, :hpricot].each do |adapter|
+    [:nokogiri, :nokogiri_fast, :nokogumbo].each do |adapter|
       pm = Premailer.new(html, :with_html_string => true, :remove_ids => true, :adapter => adapter)
       pm.to_inline_css
       doc = pm.processed_doc
@@ -233,11 +216,11 @@ END_HTML
     <div contenteditable="true" id="editable"> Test </div>
     </body> </html>
     ___
-    [:nokogiri, :hpricot].each do |adapter|
+    [:nokogiri, :nokogiri_fast, :nokogumbo].each do |adapter|
       pm = Premailer.new(html, :with_html_string => true, :reset_contenteditable => true, :adapter => adapter)
       pm.to_inline_css
       doc = pm.processed_doc
-      assert_nil doc.at('#editable')['contenteditable'],
+      assert_nil doc.at_css('#editable')['contenteditable'],
                  "#{adapter}: contenteditable attribute not removed"
     end
   end
@@ -250,9 +233,9 @@ END_HTML
     </body></html>
     html
 
-    [:nokogiri, :hpricot].each do |adapter|
+    [:nokogiri, :nokogiri_fast, :nokogumbo].each do |adapter|
       pm = Premailer.new(html, :with_html_string => true, :adapter => adapter)
-      assert_match /\r/, pm.to_inline_css
+      assert_match /\n/, pm.to_inline_css
     end
   end
 
@@ -261,10 +244,6 @@ END_HTML
     remote_setup('base.html', :adapter => :nokogiri)
     assert_match /italic/, @doc.at('h2 + h3')['style']
     assert_match /italic/, @doc.at('p[attr~=quote]')['style']
-    assert_match /italic/, @doc.at('ul li:first-of-type')['style']
-
-    remote_setup('base.html', :adapter => :hpricot)
-    assert_match /italic/, @doc.at('p[@attr~="quote"]')['style']
     assert_match /italic/, @doc.at('ul li:first-of-type')['style']
   end
 
@@ -276,13 +255,57 @@ END_HTML
 		</body> </html>
 END_HTML
 
-    [:nokogiri, :hpricot].each do |adapter|
+    [:nokogiri, :nokogiri_fast, :nokogumbo].each do |adapter|
       pm = Premailer.new(html, :with_html_string => true, :adapter => adapter)
       pm.to_inline_css
       doc = pm.processed_doc
       assert_equal '500', doc.at('table')['width']
       assert_equal '20', doc.at('td')['height']
     end
+  end
+
+  def test_empty_css_att
+    html = <<-END_HTML
+    <html> <head> <style>table { background-color: rgb(250, 250, 250); width: "550px"; } </style>
+    <body>
+    <table> <tr> <td> Test </td> </tr> </table>
+    </body> </html>
+    END_HTML
+
+    pm = Premailer.new(html, :with_html_string => true, :rgb_to_hex_attributes => true, :remove_scripts => true, :adapter => :nokogiri)
+    pm.to_inline_css
+    doc = pm.processed_doc
+
+    assert_match /<table[^>]+550px.+bgcolor="FAFAFA"/, doc.at('table').to_s
+  end
+
+  def test_rgb_color
+    html = <<-END_HTML
+    <html> <head> <style>table { background-color: rgb(250, 250, 250); } </style>
+    <body>
+    <table> <tr> <td> Test </td> </tr> </table>
+    </body> </html>
+    END_HTML
+
+    pm = Premailer.new(html, :with_html_string => true, :rgb_to_hex_attributes => true, :remove_scripts => true, :adapter => :nokogiri)
+    pm.to_inline_css
+    doc = pm.processed_doc
+    assert_equal 'FAFAFA', doc.at('table')['bgcolor']
+
+  end
+
+  def test_non_rgb_color
+    html = <<-END_HTML
+    <html> <head> <style>table { background-color:red; } </style>
+    <body>
+    <table> <tr> <td> Test </td> </tr> </table>
+    </body> </html>
+    END_HTML
+
+    pm = Premailer.new(html, :with_html_string => true, :rgb_to_hex_attributes => true, :adapter => :nokogiri)
+    pm.to_inline_css
+    doc = pm.processed_doc
+    assert_equal 'red', doc.at('table')['bgcolor']
   end
 
   def test_include_link_tags_option
@@ -307,18 +330,17 @@ END_HTML
 
   def test_input_encoding
     html_special_characters = "Ää, Öö, Üü"
-    expected_html = "<!DOCTYPE html PUBLIC \"-//W3C//DTD HTML 4.0 Transitional//EN\" \"http://www.w3.org/TR/REC-html40/loose.dtd\">\n<html><body><p>" + html_special_characters + "</p></body></html>\n"
     pm = Premailer.new(html_special_characters, :with_html_string => true, :adapter => :nokogiri, :input_encoding => "UTF-8")
-    assert_equal expected_html, pm.to_inline_css
+    assert_match /#{html_special_characters}/, pm.to_inline_css
   end
 
   # output_encoding option should return HTML Entities when set to US-ASCII
   def test_output_encoding
     html_special_characters = "©"
-    html_entities_characters = "&#169;"
-    expected_html = "<!DOCTYPE html PUBLIC \"-//W3C//DTD HTML 4.0 Transitional//EN\" \"http://www.w3.org/TR/REC-html40/loose.dtd\">\n<html><body><p>" + html_entities_characters + "</p></body></html>\n"
+    html_entities_characters = /&#169;/
+    expected_html = /#{html_entities_characters}/
     pm = Premailer.new(html_special_characters, :output_encoding => "US-ASCII", :with_html_string => true, :adapter => :nokogiri, :input_encoding => "UTF-8");
-    assert_equal expected_html, pm.to_inline_css
+    assert_match expected_html, pm.to_inline_css
   end
 
   def test_meta_encoding_downcase
@@ -337,9 +359,8 @@ END_HTML
 
   def test_htmlentities
     html_entities = "&#8217;"
-    expected_html = "<!DOCTYPE html PUBLIC \"-//W3C//DTD HTML 4.0 Transitional//EN\" \"http://www.w3.org/TR/REC-html40/loose.dtd\">\n<html><body><p>'</p></body></html>\n"
     pm = Premailer.new(html_entities, :with_html_string => true, :adapter => :nokogiri, :replace_html_entities => true)
-    assert_equal expected_html, pm.to_inline_css
+    assert_match /'/, pm.to_inline_css
   end
 
   # If a line other than the first line in the html string begins with a URI
@@ -357,7 +378,7 @@ END_HTML
     html = ""
     css = "a:hover {color:red;}"
 
-    pm = Premailer.new(html, :with_html_string => true, :css_string => css, :adapter => :nokogiri)
+    pm = Premailer.new(html, :with_html_string => true, :css_string => css, :adapter => :nokogiri, input_encoding: 'UTF-8')
     pm.to_inline_css
   end
 
